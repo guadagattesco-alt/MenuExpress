@@ -11,6 +11,8 @@ interface ShoppingListProps {
   plan: PlanEntry[]
   days: number
   objective: RecipeCategory
+  boughtItems: string[]
+  onBoughtChange: (items: string[]) => void
 }
 
 interface ShoppingItem {
@@ -21,13 +23,18 @@ interface ShoppingItem {
   section: "almacen" | "fresco"
 }
 
-export function ShoppingList({ plan, days, objective }: ShoppingListProps) {
+export function ShoppingList({ plan, days, objective, boughtItems, onBoughtChange }: ShoppingListProps) {
   const { almacen, fresco } = useMemo(() => buildShoppingList(plan), [plan])
   const { addIngredient } = useStock()
   const { showToast } = useToast()
 
-  const [bought,  setBought]  = useState<Record<string, boolean>>({})
-  const [copied,  setCopied]  = useState(false)
+  const [copied, setCopied] = useState(false)
+
+  const bought = useMemo(() => {
+    const map: Record<string, boolean> = {}
+    for (const key of boughtItems) map[key] = true
+    return map
+  }, [boughtItems])
 
   const allItems: ShoppingItem[] = useMemo(() => [
     ...almacen.map(i => ({ ...i, section: "almacen" as const })),
@@ -37,7 +44,7 @@ export function ShoppingList({ plan, days, objective }: ShoppingListProps) {
   const handleBought = (item: ShoppingItem) => {
     const key = `${item.section}-${item.item}`
     if (bought[key]) return
-    setBought(p => ({ ...p, [key]: true }))
+    onBoughtChange([...boughtItems, key])
     addIngredient(item.item, item.quantity, item.unit)
     showToast(`✅ ${item.item} agregado a tu heladera.`)
   }
@@ -45,12 +52,9 @@ export function ShoppingList({ plan, days, objective }: ShoppingListProps) {
   const handleBuyAll = () => {
     const pending = allItems.filter(i => !bought[`${i.section}-${i.item}`])
     if (!pending.length) return
-    const next = { ...bought }
-    pending.forEach(i => {
-      next[`${i.section}-${i.item}`] = true
-      addIngredient(i.item, i.quantity, i.unit)
-    })
-    setBought(next)
+    const newKeys = pending.map(i => `${i.section}-${i.item}`)
+    pending.forEach(i => addIngredient(i.item, i.quantity, i.unit))
+    onBoughtChange([...boughtItems, ...newKeys])
     showToast(`🛒 ¡${pending.length} ingredientes agregados a tu heladera!`)
   }
 
@@ -130,15 +134,9 @@ export function ShoppingList({ plan, days, objective }: ShoppingListProps) {
   }
 
   return (
-    /*
-      La lista usa overflow-y: auto con maxHeight heredado del padre (calc(100vh - 5rem))
-      Si el contenido es corto → no scrollea, ocupa lo que necesita
-      Si el contenido es largo → scrollea internamente
-    */
     <div className="flex flex-col gap-4 rounded-2xl border border-border bg-card p-5 shadow-sm overflow-y-auto h-fit"
       style={{ maxHeight: "inherit" }}>
 
-      {/* Header */}
       <div className="flex items-center gap-2 pb-3 border-b border-border">
         <div className="flex size-9 items-center justify-center rounded-xl shrink-0"
           style={{ background: "var(--accent)" }}>
@@ -157,7 +155,6 @@ export function ShoppingList({ plan, days, objective }: ShoppingListProps) {
         </div>
       </div>
 
-      {/* Comprar todo */}
       {!allDone && pendingCount > 1 && (
         <button type="button" onClick={handleBuyAll}
           className="w-full inline-flex items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-bold text-white transition-all hover:opacity-90 active:scale-95"
@@ -166,7 +163,7 @@ export function ShoppingList({ plan, days, objective }: ShoppingListProps) {
           Compré todo
         </button>
       )}
-      {allDone && (
+      {allDone && allItems.length > 0 && (
         <div className="rounded-xl p-3 text-center text-sm font-semibold text-green-700"
           style={{ background: "#f0faf4", border: "1px solid #a8dfc0" }}>
           🎉 ¡Todo en tu heladera!
@@ -176,7 +173,6 @@ export function ShoppingList({ plan, days, objective }: ShoppingListProps) {
       {renderSection("Almacén / Congelar", "📦", almacen, "almacen", "#b37a00")}
       {renderSection("Frescos del día",    "🥬", fresco,  "fresco",  "var(--primary)")}
 
-      {/* WhatsApp */}
       <div className="rounded-xl p-4 flex flex-col gap-3 mt-1"
         style={{ background: "#f0faf4", border: "1px solid #a8dfc0" }}>
         <p className="text-xs font-bold text-green-700">📲 Compartir por WhatsApp</p>

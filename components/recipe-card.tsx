@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils"
 import { CATEGORY_LABELS, type Recipe } from "@/lib/recipes"
 import { useStock } from "@/lib/stock-context"
 import { useToast } from "@/lib/toast-context"
+import { useAuth } from "@/lib/auth-context" 
 
 interface RecipeCardProps {
   recipe: Recipe
@@ -12,6 +13,8 @@ interface RecipeCardProps {
   matchPct?: number
   missing?: string[]
   blocked?: boolean  // si true, botón deshabilitado
+  cooked?: boolean  // si true, mostrar como ya cocinado
+  onCooked?: () => void // callback para marcar como cocinado
 }
 
 const TYPE_LABEL: Record<Recipe["type"], string> = {
@@ -46,10 +49,10 @@ const RECIPE_IMAGES: Record<string, string> = {
   r24: "https://images.unsplash.com/photo-1558030006-450675393462?w=600&q=80",
 }
 
-export function RecipeCard({ recipe, day, matchPct, missing, blocked }: RecipeCardProps) {
+export function RecipeCard({ recipe, day, matchPct, missing, blocked, cooked, onCooked }: RecipeCardProps) {
   const { cookRecipe } = useStock()
   const { showToast } = useToast()
-
+  const { user } = useAuth()
   const isFullMatch   = matchPct === 100
   const isPartialMatch = matchPct !== undefined && matchPct < 100
   const isAlmuerzo    = recipe.type === "almuerzo"
@@ -60,8 +63,15 @@ export function RecipeCard({ recipe, day, matchPct, missing, blocked }: RecipeCa
     if (isBlocked) return
     cookRecipe(recipe)
     showToast(`🍽️ ¡A cocinar "${recipe.name}"! Stock actualizado.`)
+    if (user) {
+      fetch('/api/cooked-recipe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.id, recipeId: recipe.id, recipeName: recipe.name })
+      }).catch(() => {})
+    }
+    onCooked?.()
   }
-
   return (
     <article className={cn(
       "flex flex-col rounded-2xl border bg-card shadow-sm overflow-hidden transition-all duration-300",
@@ -104,6 +114,11 @@ export function RecipeCard({ recipe, day, matchPct, missing, blocked }: RecipeCa
           <span className="absolute top-3 right-3 rounded-full px-2.5 py-1 text-xs font-bold shadow-lg"
             style={{ background: "#f5a623", color: "#1a3c2e" }}>
             ⚡ {matchPct}%
+          </span>
+        )}
+        {cooked && (
+          <span className="absolute top-3 right-3 inline-flex items-center gap-1 rounded-full bg-green-500 px-2.5 py-1 text-xs font-bold text-white shadow-lg">
+          <Check className="size-3" /> Cocinado
           </span>
         )}
         {isBlocked && (
@@ -161,8 +176,10 @@ export function RecipeCard({ recipe, day, matchPct, missing, blocked }: RecipeCa
             : { background: "linear-gradient(135deg, #1a3c2e 0%, #2d7a4f 100%)" }}>
           {isBlocked
             ? <><Lock className="size-4" /> Completá los ingredientes</>
-            : <><Check className="size-4" /> ¡Cocinada! Restar stock</>
-          }
+            : cooked
+              ? <><Check className="size-4" /> Cocinar de nuevo</>
+              : <><Check className="size-4" /> ¡Cocinada! Restar stock</>
+            }
         </button>
       </div>
     </article>

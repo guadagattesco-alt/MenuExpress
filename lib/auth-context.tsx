@@ -1,5 +1,4 @@
 "use client"
-
 import {
   createContext,
   useContext,
@@ -9,6 +8,7 @@ import {
 } from "react"
 
 interface User {
+  id: string
   name: string
   email: string
 }
@@ -16,21 +16,16 @@ interface User {
 interface AuthContextValue {
   user: User | null
   login: (email: string, password: string) => Promise<{ ok: boolean; error?: string }>
+  register: (name: string, email: string, password: string) => Promise<{ ok: boolean; error?: string }>
   logout: () => void
   hydrated: boolean
-}
-
-// Usuarios hardcodeados — reemplazar con Supabase Auth en producción
-const MOCK_USERS: Record<string, { password: string; name: string }> = {
-  "demo@menuexpress.com": { password: "demo1234", name: "Usuario Demo" },
-  "admin@menuexpress.com": { password: "admin1234", name: "Admin" },
 }
 
 const STORAGE_KEY = "menuexpress-user"
 const AuthContext = createContext<AuthContextValue | null>(null)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user,     setUser]     = useState<User | null>(null)
+  const [user, setUser] = useState<User | null>(null)
   const [hydrated, setHydrated] = useState(false)
 
   useEffect(() => {
@@ -41,17 +36,53 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setHydrated(true)
   }, [])
 
+  // 1. LOGIN REAL CON CONEXIÓN A LA API
   const login = async (email: string, password: string) => {
-    // Simular latencia de red
-    await new Promise((r) => setTimeout(r, 800))
-    const found = MOCK_USERS[email.toLowerCase().trim()]
-    if (!found || found.password !== password) {
-      return { ok: false, error: "Email o contraseña incorrectos." }
+    try {
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        return { ok: false, error: data.error || "Error al iniciar sesión." }
+      }
+
+      // Si salió bien, guardamos el usuario real que devolvió MongoDB
+      const loggedUser: User = data.user
+      setUser(loggedUser)
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(loggedUser))
+      return { ok: true }
+
+    } catch (error) {
+      return { ok: false, error: "No se pudo conectar con el servidor." }
     }
-    const u: User = { name: found.name, email: email.toLowerCase().trim() }
-    setUser(u)
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(u)) } catch { /* ignore */ }
-    return { ok: true }
+  }
+
+  // 2. REGISTRO REAL CON CONEXIÓN A LA API
+  const register = async (name: string, email: string, password: string) => {
+    try {
+      const response = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, email, password })
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        return { ok: false, error: data.error || "Error al registrarse." }
+      }
+
+      // Auto-login después de registrarse exitosamente
+      return await login(email, password)
+
+    } catch (error) {
+      return { ok: false, error: "No se pudo conectar con el servidor." }
+    }
   }
 
   const logout = () => {
@@ -60,11 +91,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, hydrated }}>
+    <AuthContext.Provider value={{ user, login, register, logout, hydrated }}>
       {children}
     </AuthContext.Provider>
-  )
-}
+  )}
 
 export function useAuth() {
   const ctx = useContext(AuthContext)

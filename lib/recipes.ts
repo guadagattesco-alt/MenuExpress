@@ -2,13 +2,14 @@
 export type RecipeCategory = "saludable" | "economico" | "proteico"
 export type RecipeType = "almuerzo" | "cena"
 
+export type Durability = "fresco" | "almacen"
+
 export interface Ingredient {
   item: string
   quantity: number
   unit: string
-  durability: "fresco" | "almacen"
+  durability: Durability
 }
-
 export interface Recipe {
   id: string
   name: string

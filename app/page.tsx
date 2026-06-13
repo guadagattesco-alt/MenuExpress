@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useRef } from "react"
 import { StockProvider } from "@/lib/stock-context"
 import { ToastProvider } from "@/lib/toast-context"
 import { AuthProvider, useAuth } from "@/lib/auth-context"
@@ -17,6 +17,7 @@ export interface PlanState {
   plan: PlanEntry[] | null
   days: number
   objective: RecipeCategory
+  boughtItems: string[]
 }
 
 export interface SalvavidasState {
@@ -27,9 +28,76 @@ function AppShell() {
   const { user, logout, hydrated } = useAuth()
   const [tab, setTab] = useState<TabId>("plan")
 
-  const [planState, setPlanState] = useState<PlanState>({
-    plan: null, days: 3, objective: "saludable",
+// Recordar la última pestaña activa
+useEffect(() => {
+  try {
+    const saved = localStorage.getItem("menuexpress-tab") as TabId | null
+    if (saved) setTab(saved)
+  } catch { /* ignore */ }
+}, [])
+
+useEffect(() => {
+  try { localStorage.setItem("menuexpress-tab", tab) } catch { /* ignore */ }
+}, [tab])
+
+const [planState, setPlanState] = useState<PlanState>({
+    plan: null, days: 3, objective: "saludable", boughtItems: [],
   })
+  const skipNextShoppingSave = useRef(false)
+
+  // Cargar el plan guardado al loguearse
+  useEffect(() => {
+    if (!user?.id) return
+    fetch(`/api/plan?userId=${user.id}`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.plan) {
+          setPlanState(prev => ({ ...prev, plan: data.plan, days: data.days, objective: data.objective }))
+        }
+      })
+      .catch(() => {})
+  }, [user])
+
+  // Guardar el plan cada vez que cambia
+  useEffect(() => {
+    if (!user?.id || !planState.plan) return
+    fetch('/api/plan', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userId: user.id,
+        days: planState.days,
+        objective: planState.objective,
+        plan: planState.plan,
+      })
+    }).catch(() => {})
+  }, [planState.plan])
+
+  // Cargar la lista de compras guardada al loguearse
+  useEffect(() => {
+    if (!user?.id) return
+    fetch(`/api/shopping?userId=${user.id}`)
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data.boughtItems) && data.boughtItems.length > 0) {
+          skipNextShoppingSave.current = true
+          setPlanState(prev => ({ ...prev, boughtItems: data.boughtItems }))
+        }
+      })
+      .catch(() => {})
+  }, [user])
+
+  // Guardar la lista de compras cada vez que cambia
+  useEffect(() => {
+    if (!user?.id) return
+    if (skipNextShoppingSave.current) { skipNextShoppingSave.current = false; return }
+    fetch('/api/shopping', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: user.id, boughtItems: planState.boughtItems })
+    }).catch(() => {})
+  }, [planState.boughtItems, user])
+
   const [salvavidasState, setSalvavidasState] = useState<SalvavidasState>({
     results: null,
   })

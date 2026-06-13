@@ -9,6 +9,8 @@ export interface PlanEntry {
   day: number
   lunch: Recipe
   dinner: Recipe
+  cookedLunch?: boolean
+  cookedDinner?: boolean
 }
 
 export interface ShoppingItem {
@@ -32,7 +34,7 @@ export function generatePlan(
   for (let day = 1; day <= days; day++) {
     const lunch = lunches[(day - 1) % lunches.length]
     const dinner = dinners[(day - 1) % dinners.length]
-    plan.push({ day, lunch, dinner })
+    plan.push({ day, lunch, dinner, cookedLunch: false, cookedDinner: false })
   }
   return plan
 }

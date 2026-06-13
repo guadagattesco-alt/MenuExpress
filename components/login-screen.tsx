@@ -6,7 +6,8 @@ import { useAuth } from "@/lib/auth-context"
 type View = "hero" | "login" | "register" | "forgot"
 
 export function LoginScreen() {
-  const { login } = useAuth()
+  // Traemos las funciones reales del contexto
+  const { login, register } = useAuth()
   const [view,     setView]     = useState<View>("hero")
   const [email,    setEmail]    = useState("")
   const [password, setPassword] = useState("")
@@ -17,6 +18,7 @@ export function LoginScreen() {
 
   const reset = () => { setError(""); setSuccess("") }
 
+  // 1. MANEJO DE LOGIN REAL
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!email || !password) { setError("Completá todos los campos."); return }
@@ -26,15 +28,25 @@ export function LoginScreen() {
     if (!res.ok) setError(res.error ?? "Error desconocido.")
   }
 
+  // 2. MANEJO DE REGISTRO REAL (MANDANDO A MONGODB)
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!name || !email || !password) { setError("Completá todos los campos."); return }
     if (password.length < 6) { setError("La contraseña debe tener al menos 6 caracteres."); return }
     reset(); setLoading(true)
-    await new Promise(r => setTimeout(r, 1000))
+    
+    // Llamamos a la función real del context
+    const res = await register(name, email, password)
     setLoading(false)
-    setSuccess("¡Cuenta creada! Ahora podés ingresar.")
-    setView("login")
+    
+    if (res.ok) {
+      setSuccess("¡Cuenta creada con éxito! Ahora podés ingresar.")
+      setView("login")
+      // Limpiamos el nombre para que no quede colgado si vuelve a registrarse
+      setName("") 
+    } else {
+      setError(res.error ?? "Error al intentar registrar el usuario.")
+    }
   }
 
   const handleForgot = async (e: React.FormEvent) => {
@@ -46,11 +58,9 @@ export function LoginScreen() {
     setSuccess(`Te enviamos un link de recuperación a ${email}`)
   }
 
+  // Deshabilitamos temporalmente o dejamos el mock de Google apuntando al login real si querés testear rápido
   const handleGoogle = async () => {
-    setLoading(true)
-    await new Promise(r => setTimeout(r, 1200))
-    await login("demo@menuexpress.com", "demo1234")
-    setLoading(false)
+    setError("El inicio con Google simulado no está disponible con la base de datos real. Usá el formulario.")
   }
 
   return (
@@ -146,6 +156,8 @@ export function LoginScreen() {
                 </div>
               )}
 
+              {error && <div className="mb-4 rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-600 font-medium">{error}</div>}
+
               {/* LOGIN */}
               {view === "login" && (
                 <>
@@ -167,36 +179,12 @@ export function LoginScreen() {
                       <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" autoComplete="current-password"
                         className="rounded-xl border border-input px-4 py-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20" />
                     </div>
-                    {error && <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-600">{error}</div>}
                     <button type="submit" disabled={loading}
                       className="w-full rounded-xl py-3.5 text-sm font-bold text-white hover:opacity-90 active:scale-95 disabled:opacity-60 flex items-center justify-center gap-2 mt-1"
                       style={{ background: "linear-gradient(135deg, #1a3c2e 0%, #2d7a4f 100%)" }}>
-                      {loading ? <><svg className="animate-spin size-4" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="white" strokeWidth="4"/><path className="opacity-75" fill="white" d="M4 12a8 8 0 018-8v8z"/></svg>Ingresando...</> : "Ingresar →"}
-                    </button>
-                    <div className="relative flex items-center gap-3 my-1">
-                      <div className="flex-1 h-px bg-border" />
-                      <span className="text-xs text-muted-foreground font-medium">o</span>
-                      <div className="flex-1 h-px bg-border" />
-                    </div>
-                    <button type="button" onClick={handleGoogle} disabled={loading}
-                      className="w-full rounded-xl py-3 text-sm font-semibold border border-border bg-white hover:bg-gray-50 transition-colors flex items-center justify-center gap-3">
-                      <svg className="size-4" viewBox="0 0 24 24">
-                        <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                        <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                        <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-                        <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-                      </svg>
-                      Continuar con Google
+                      {loading ? <><svg className="animate-spin size-4" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="white" strokeWidth="4"/><path className="opacity-75" fill="white" d="M4 12a8 8 0 018-8v8z"/></svg>Procesando...</> : "Ingresar →"}
                     </button>
                   </form>
-                  <div className="mt-5 rounded-xl p-3.5" style={{ background: "#f0faf4", border: "1px solid #a8dfc0" }}>
-                    <p className="text-xs font-bold text-green-700 mb-1">🧪 Demo rápido</p>
-                    <p className="text-xs text-green-800 font-mono mb-2">demo@menuexpress.com / demo1234</p>
-                    <button type="button" onClick={() => { setEmail("demo@menuexpress.com"); setPassword("demo1234"); setError("") }}
-                      className="text-xs font-bold underline" style={{ color: "var(--primary)" }}>
-                      Completar automáticamente
-                    </button>
-                  </div>
                 </>
               )}
 
@@ -220,26 +208,10 @@ export function LoginScreen() {
                       <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Mínimo 6 caracteres"
                         className="rounded-xl border border-input px-4 py-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20" />
                     </div>
-                    {error && <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-600">{error}</div>}
                     <button type="submit" disabled={loading}
                       className="w-full rounded-xl py-3.5 text-sm font-bold text-white hover:opacity-90 active:scale-95 disabled:opacity-60 flex items-center justify-center gap-2 mt-1"
                       style={{ background: "linear-gradient(135deg, #1a3c2e 0%, #2d7a4f 100%)" }}>
                       {loading ? "Creando cuenta..." : "Crear cuenta →"}
-                    </button>
-                    <div className="relative flex items-center gap-3 my-1">
-                      <div className="flex-1 h-px bg-border" />
-                      <span className="text-xs text-muted-foreground font-medium">o</span>
-                      <div className="flex-1 h-px bg-border" />
-                    </div>
-                    <button type="button" onClick={handleGoogle} disabled={loading}
-                      className="w-full rounded-xl py-3 text-sm font-semibold border border-border bg-white hover:bg-gray-50 transition-colors flex items-center justify-center gap-3">
-                      <svg className="size-4" viewBox="0 0 24 24">
-                        <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                        <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                        <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-                        <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-                      </svg>
-                      Continuar con Google
                     </button>
                   </form>
                 </>
@@ -260,7 +232,6 @@ export function LoginScreen() {
                       <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="tu@email.com"
                         className="rounded-xl border border-input px-4 py-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20" />
                     </div>
-                    {error && <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-600">{error}</div>}
                     <button type="submit" disabled={loading}
                       className="w-full rounded-xl py-3.5 text-sm font-bold text-white hover:opacity-90 active:scale-95 disabled:opacity-60"
                       style={{ background: "linear-gradient(135deg, #1a3c2e 0%, #2d7a4f 100%)" }}>
@@ -272,7 +243,7 @@ export function LoginScreen() {
             </div>
 
             <p className="text-center text-xs text-muted-foreground">
-              Auth simulada · Se conectará a Supabase en producción
+              Base de Datos Conectada · MongoDB Atlas Real
             </p>
           </div>
         </div>

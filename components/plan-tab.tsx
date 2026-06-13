@@ -7,6 +7,8 @@ import { generatePlan } from "@/lib/planner"
 import type { RecipeCategory } from "@/lib/recipes"
 import type { PlanState } from "@/app/page"
 
+
+
 const DURATIONS = [
   { value: 1, label: "1 día",   sub: "Ideal para hoy"  },
   { value: 3, label: "3 días",  sub: "Escapada corta"  },
@@ -30,7 +32,17 @@ export function PlanTab({ state, onStateChange }: PlanTabProps) {
   const setDays      = (d: number)         => onStateChange({ ...state, days: d })
   const setObjective = (o: RecipeCategory) => onStateChange({ ...state, objective: o })
   const handleGenerate = () =>
-    onStateChange({ ...state, plan: generatePlan(days, objective) })
+  onStateChange({ ...state, plan: generatePlan(days, objective), boughtItems: [] })
+  const handleMarkCooked = (day: number, mealType: "almuerzo" | "cena") => {
+  if (!plan) return
+  const updated = plan.map(entry => {
+    if (entry.day !== day) return entry
+    return mealType === "almuerzo"
+      ? { ...entry, cookedLunch: true }
+      : { ...entry, cookedDinner: true }
+  })
+  onStateChange({ ...state, plan: updated })
+}
 
   return (
     <div className="flex flex-col flex-1">
@@ -121,8 +133,16 @@ export function PlanTab({ state, onStateChange }: PlanTabProps) {
                     </span>
                   </div>
                   <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                    <RecipeCard recipe={entry.lunch}  day={entry.day} />
-                    <RecipeCard recipe={entry.dinner} day={entry.day} />
+                    <RecipeCard
+                      recipe={entry.lunch} day={entry.day}
+                      cooked={entry.cookedLunch}
+                      onCooked={() => handleMarkCooked(entry.day, "almuerzo")}
+                    />
+                    <RecipeCard
+                      recipe={entry.dinner} day={entry.day}
+                      cooked={entry.cookedDinner}
+                      onCooked={() => handleMarkCooked(entry.day, "cena")}
+                    />  
                   </div>
                 </div>
               ))}
@@ -134,7 +154,13 @@ export function PlanTab({ state, onStateChange }: PlanTabProps) {
               Si es larga, scrollea internamente sin mover la página
             */}
             <div className="lg:sticky lg:top-20" style={{ maxHeight: "calc(100vh - 5rem)" }}>
-              <ShoppingList plan={plan} days={days} objective={objective} />
+              <ShoppingList 
+                plan={plan} 
+                days={days} 
+                objective={objective}
+                boughtItems={state.boughtItems}
+                onBoughtChange={(items) => onStateChange({ ...state, boughtItems: items })}
+              />
             </div>
           </div>
         </div>

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useMemo } from "react"
-import { Trash2, Plus, Minus, Cloud, Loader2, Package, Search as SearchIcon } from "lucide-react"
+import { Trash2, Plus, Minus, Package, Search as SearchIcon } from "lucide-react"
 import { useStock } from "@/lib/stock-context"
 import { useToast } from "@/lib/toast-context"
 
@@ -21,7 +21,7 @@ const getCategoryFor = (name: string) => {
   return "🫙 Otros"
 }
 
-const PREDEFINED = Object.values(CATEGORIES).flat().filter(Boolean).sort((a,b) => a.localeCompare(b,"es"))
+const PREDEFINED = [...new Set(Object.values(CATEGORIES).flat().filter(Boolean))].sort((a,b) => a.localeCompare(b,"es"))
 
 const UNITS = [
   { value: "g",  label: "g — gramos"     },
@@ -50,14 +50,13 @@ const getEmoji = (n: string) => ING_EMOJI[n] ?? "🥘"
 
 export function FridgeTab() {
   const { myStock, addIngredient, removeIngredient, adjustIngredient, hydrated } = useStock()
-  const { showToast, hideToast } = useToast()
+  const { showToast } = useToast()
 
   // Input para agregar
   const [search,   setSearch]   = useState("")
   const [selName,  setSelName]  = useState("")
   const [quantity, setQuantity] = useState("")
   const [unit,     setUnit]     = useState("u")
-  const [syncing,  setSyncing]  = useState(false)
   const [showDropdown, setShowDropdown] = useState(false)
 
   // Filtro de búsqueda sobre los ingredientes YA cargados
@@ -81,13 +80,6 @@ export function FridgeTab() {
     addIngredient(name, qty, unit)
     showToast(`✅ ${name} agregado.`)
     setSearch(""); setSelName(""); setQuantity("")
-  }
-
-  const handleSync = () => {
-    if (syncing) return
-    setSyncing(true)
-    const id = showToast("Sincronizando con la nube...", { spinner: true })
-    setTimeout(() => { hideToast(id); setSyncing(false); showToast("☁️ ¡Stock sincronizado!") }, 1500)
   }
 
   const entries = Object.entries(myStock).sort((a, b) => a[0].localeCompare(b[0], "es"))
@@ -294,19 +286,6 @@ export function FridgeTab() {
             ))}
           </div>
         )}
-
-        {/* Sync */}
-        <div className="flex items-center justify-between rounded-2xl border border-border bg-card p-5 shadow-sm">
-          <div>
-            <p className="text-sm font-bold">Guardar en la nube</p>
-            <p className="text-xs text-muted-foreground mt-0.5">Accedé a tu stock desde cualquier dispositivo</p>
-          </div>
-          <button type="button" onClick={handleSync} disabled={syncing}
-            className="inline-flex items-center gap-2 rounded-xl border border-border bg-background px-4 py-2.5 text-sm font-semibold hover:bg-accent disabled:opacity-60 transition-colors">
-            {syncing ? <Loader2 className="size-4 animate-spin" /> : <Cloud className="size-4" />}
-            {syncing ? "Sincronizando..." : "Guardar"}
-          </button>
-        </div>
       </div>
     </div>
   )

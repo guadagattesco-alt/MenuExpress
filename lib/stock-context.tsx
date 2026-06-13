@@ -2,9 +2,10 @@
 
 import {
   createContext, useContext, useState, useEffect,
-  useCallback, type ReactNode,
+  useRef, type ReactNode,
 } from "react"
 import type { Recipe } from "@/lib/recipes"
+import { useAuth } from "@/lib/auth-context"
 
 interface StockEntry { quantity: number; unit: string }
 type Stock = Record<string, StockEntry>
@@ -47,9 +48,12 @@ const DEFAULT_STOCK: Stock = {
 const StockContext = createContext<StockContextValue | null>(null)
 
 export function StockProvider({ children }: { children: ReactNode }) {
+  const { user } = useAuth()
   const [myStock, setMyStock] = useState<Stock>(DEFAULT_STOCK)
   const [hydrated, setHydrated] = useState(false)
+  const skipNextSave = useRef(false)
 
+  // 1. Hidratar rápido desde localStorage (evita parpadeo inicial)
   useEffect(() => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY)
@@ -58,45 +62,79 @@ export function StockProvider({ children }: { children: ReactNode }) {
     setHydrated(true)
   }, [])
 
-  const persist = useCallback((s: Stock) => {
-    setMyStock(s)
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(s)) } catch { /* ignore */ }
-  }, [])
+  // 2. Si hay usuario logueado, traer su stock real desde Mongo
+  useEffect(() => {
+    if (!user) return
+    fetch(`/api/stock?userId=${user.id}`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.found) {
+          skipNextSave.current = true
+          setMyStock(data.stock)
+        }
+        // si es un usuario nuevo sin stock guardado, se queda con DEFAULT_STOCK
+        // y el efecto de guardado lo va a sembrar en Mongo automáticamente
+      })
+      .catch(() => {})
+  }, [user])
+
+  // 3. Cada vez que cambia el stock, guardamos en localStorage y (si hay usuario) en Mongo
+  useEffect(() => {
+    if (!hydrated) return
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(myStock)) } catch { /* ignore */ }
+
+    if (!user?.id) return
+    if (skipNextSave.current) { skipNextSave.current = false; return }
+
+    fetch('/api/stock', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: user.id, stock: myStock })
+    }).catch(() => {})
+  }, [myStock, user, hydrated])
 
   const addIngredient = (name: string, qty: number, unit: string) => {
     const trimmed = name.trim()
     if (!trimmed) return
-    const next = { ...myStock }
-    if (next[trimmed]) next[trimmed] = { ...next[trimmed], quantity: next[trimmed].quantity + qty }
-    else next[trimmed] = { quantity: qty, unit }
-    persist(next)
+    setMyStock(prev => {
+      const next = { ...prev }
+      if (next[trimmed]) next[trimmed] = { ...next[trimmed], quantity: next[trimmed].quantity + qty }
+      else next[trimmed] = { quantity: qty, unit }
+      return next
+    })
   }
 
   const removeIngredient = (name: string) => {
-    const next = { ...myStock }
-    delete next[name]
-    persist(next)
+    setMyStock(prev => {
+      const next = { ...prev }
+      delete next[name]
+      return next
+    })
   }
 
   const adjustIngredient = (name: string, delta: number) => {
-    if (!myStock[name]) return
-    const next = { ...myStock }
-    const newQty = next[name].quantity + delta
-    if (newQty <= 0) delete next[name]
-    else next[name] = { ...next[name], quantity: newQty }
-    persist(next)
+    setMyStock(prev => {
+      if (!prev[name]) return prev
+      const next = { ...prev }
+      const newQty = next[name].quantity + delta
+      if (newQty <= 0) delete next[name]
+      else next[name] = { ...next[name], quantity: newQty }
+      return next
+    })
   }
 
   const cookRecipe = (recipe: Recipe) => {
-    const next = { ...myStock }
-    for (const ing of recipe.ingredients) {
-      if (next[ing.item]) {
-        const newQty = next[ing.item].quantity - ing.quantity
-        if (newQty <= 0) delete next[ing.item]
-        else next[ing.item] = { ...next[ing.item], quantity: newQty }
+    setMyStock(prev => {
+      const next = { ...prev }
+      for (const ing of recipe.ingredients) {
+        if (next[ing.item]) {
+          const newQty = next[ing.item].quantity - ing.quantity
+          if (newQty <= 0) delete next[ing.item]
+          else next[ing.item] = { ...next[ing.item], quantity: newQty }
+        }
       }
-    }
-    persist(next)
+      return next
+    })
   }
 
   return (
