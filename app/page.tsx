@@ -28,6 +28,11 @@ function AppShell() {
   const { user, logout, hydrated } = useAuth()
   const [tab, setTab] = useState<TabId>("plan")
 
+  const handleTabChange = (newTab: TabId) => {
+   setTab(newTab)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
 // Recordar la última pestaña activa
 useEffect(() => {
   try {
@@ -107,7 +112,7 @@ const [planState, setPlanState] = useState<PlanState>({
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      <Header active={tab} onChange={setTab} onLogout={logout} />
+      <Header active={tab} onChange={handleTabChange} onLogout={logout} />
 
       {/* Plan tab: hero full-bleed, contenido con padding */}
       <div className="flex-1 flex flex-col" style={{ display: tab === "plan" ? "flex" : "none" }}>
