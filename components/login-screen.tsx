@@ -60,8 +60,15 @@ export function LoginScreen() {
 
   // Deshabilitamos temporalmente o dejamos el mock de Google apuntando al login real si querés testear rápido
   const handleGoogle = async () => {
-    setError("El inicio con Google simulado no está disponible con la base de datos real. Usá el formulario.")
+  setLoading(true)
+  try {
+    const { signIn } = await import("next-auth/react")
+    await signIn("google", { callbackUrl: "/" })
+  } catch {
+    setError("Error al iniciar con Google.")
+    setLoading(false)
   }
+}
 
   return (
     <div className="min-h-screen flex flex-col">

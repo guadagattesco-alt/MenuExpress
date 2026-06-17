@@ -36,6 +36,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setHydrated(true)
   }, [])
 
+  useEffect(() => {
+  if (user) return // ya está logueado con el sistema propio
+  // Verificar si hay sesión de NextAuth (Google)
+  fetch('/api/auth/session')
+    .then(res => res.json())
+    .then(data => {
+      if (data?.user?.email) {
+        const nextAuthUser: User = {
+          id: data.user.id ?? data.user.email,
+          name: data.user.name ?? "Usuario",
+          email: data.user.email,
+        }
+        setUser(nextAuthUser)
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(nextAuthUser))
+      }
+      setHydrated(true)
+    })
+    .catch(() => setHydrated(true))
+}, [])
+
   // 1. LOGIN REAL CON CONEXIÓN A LA API
   const login = async (email: string, password: string) => {
     try {
