@@ -108,7 +108,10 @@ const [planState, setPlanState] = useState<PlanState>({
   })
 
   if (!hydrated) return null
-  if (!user) return <LoginScreen />
+  if (!user) {
+  if (typeof window !== "undefined") window.location.href = "/login"
+  return null
+}
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -137,13 +140,5 @@ const [planState, setPlanState] = useState<PlanState>({
 }
 
 export default function Page() {
-  return (
-    <AuthProvider>
-      <ToastProvider>
-        <StockProvider>
-          <AppShell />
-        </StockProvider>
-      </ToastProvider>
-    </AuthProvider>
-  )
+  return <AppShell />
 }

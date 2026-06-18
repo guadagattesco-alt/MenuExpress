@@ -1,15 +1,13 @@
 import type { Metadata, Viewport } from "next"
 import "./globals.css"
+import { AuthProvider } from "@/lib/auth-context"
+import { ToastProvider } from "@/lib/toast-context"
+import { StockProvider } from "@/lib/stock-context"
 
 export const metadata: Metadata = {
   title: "MenuExpress — Tu planificador gastronómico",
   description: "Planificá tus comidas, gestioná tu heladera y descubrí qué cocinar hoy.",
   manifest: "/manifest.json",
-  appleWebApp: {
-    capable: true,
-    statusBarStyle: "default",
-    title: "MenuExpress",
-  },
 }
 
 export const viewport: Viewport = {
@@ -22,11 +20,15 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="es">
-      <head>
-        <link rel="apple-touch-icon" href="/icon-192.png" />
-      </head>
-      <body>{children}</body>
+      <body>
+        <AuthProvider>
+          <ToastProvider>
+            <StockProvider>
+              {children}
+            </StockProvider>
+          </ToastProvider>
+        </AuthProvider>
+      </body>
     </html>
   )
 }
-

@@ -25,9 +25,12 @@ export function LoginScreen() {
     reset(); setLoading(true)
     const res = await login(email, password)
     setLoading(false)
-    if (!res.ok) setError(res.error ?? "Error desconocido.")
+    if (!res.ok) {
+      setError(res.error ?? "Error desconocido.")
+    } else {
+    window.location.href = "/"
+    }
   }
-
   // 2. MANEJO DE REGISTRO REAL (MANDANDO A MONGODB)
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault()
